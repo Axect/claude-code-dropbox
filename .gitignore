@@ -1,0 +1,19 @@
+# Credentials — must never be committed
+credentials.json
+*.credentials
+.env
+.env.*
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Test artifacts
+/tmp-test/
+*.bin
+integration-scratch/
