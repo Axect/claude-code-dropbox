@@ -8,6 +8,17 @@ get_access_token() {
     echo "cc-dropbox: no credentials. Run setup.sh first." >&2
     return 2
   fi
-  # Minimal stub to be filled in subsequent tasks.
+
+  local now access_token expires_at
+  now=$(date +%s)
+  access_token=$(jq -r '.access_token // ""' "$CC_DROPBOX_CREDS")
+  expires_at=$(jq -r '.access_token_expires_at // 0' "$CC_DROPBOX_CREDS")
+
+  if [[ -n "$access_token" && "$expires_at" -gt "$((now + 60))" ]]; then
+    printf '%s' "$access_token"
+    return 0
+  fi
+
+  # Refresh path — implemented in Task 5.
   return 99
 }
