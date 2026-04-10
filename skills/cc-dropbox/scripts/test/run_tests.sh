@@ -8,20 +8,26 @@ TOTAL_FAIL=0
 shopt -s nullglob
 for test_file in "$TEST_DIR"/test_*.sh; do
   echo "=== $(basename "$test_file") ==="
-  # Run in subshell to isolate exports/HOME/etc.
   output=$(bash -c "
+    set -eo pipefail
     source '$TEST_DIR/lib.sh'
     source '$test_file'
     echo \"__PASS__:\$TEST_PASS\"
     echo \"__FAIL__:\$TEST_FAIL\"
   " 2>&1) || true
-  # Extract counters
-  pass=$(echo "$output" | awk -F: '/^__PASS__:/{print $2}' | tail -1)
-  fail=$(echo "$output" | awk -F: '/^__FAIL__:/{print $2}' | tail -1)
-  pass=${pass:-0}
-  fail=${fail:-0}
-  # Print anything that isn't a counter line
-  echo "$output" | grep -v '^__PASS__:\|^__FAIL__:' || true
+
+  pass=$(echo "$output" | awk -F: '$1=="__PASS__"{print $2}' | tail -1)
+  fail=$(echo "$output" | awk -F: '$1=="__FAIL__"{print $2}' | tail -1)
+
+  # Anything not a counter line is noise we want to surface.
+  echo "$output" | grep -Ev '^(__PASS__|__FAIL__):' || true
+
+  if [[ -z "$pass" || -z "$fail" ]]; then
+    echo "  ERROR: test file did not report counters (aborted early?)"
+    TOTAL_FAIL=$((TOTAL_FAIL + 1))
+    continue
+  fi
+
   echo "  pass=$pass fail=$fail"
   TOTAL_PASS=$((TOTAL_PASS + pass))
   TOTAL_FAIL=$((TOTAL_FAIL + fail))

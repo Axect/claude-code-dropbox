@@ -42,12 +42,14 @@ assert_contains() {
 }
 
 # Create an isolated HOME with an empty ~/.config/cc-dropbox directory.
-# Sets HOME to the temp dir and returns the path.
+# Cleans up automatically on subshell exit (each test file runs in its
+# own subshell courtesy of run_tests.sh). Returns the path on stdout.
 make_tmp_home() {
   local tmp
   tmp=$(mktemp -d)
   export HOME="$tmp"
   mkdir -p "$tmp/.config/cc-dropbox"
+  trap 'rm -rf "$HOME"' EXIT
   echo "$tmp"
 }
 
@@ -60,14 +62,18 @@ write_creds() {
 }
 
 # Mock curl: responds based on $MOCK_CURL_RESPONSE (body) and
-# $MOCK_CURL_HTTP_CODE (default 200). Records the last invocation
-# args into $MOCK_CURL_LAST_ARGS for assertions.
-# The scripts under test must use:
+# $MOCK_CURL_HTTP_CODE (default 200). Records each invocation's args
+# (one line per call) to $MOCK_CURL_ARGS_FILE. Tests assert on the
+# last-recorded args via last_curl_args.
+#
+# Scripts under test should use:
 #   response=$(curl -sS -w '\n%{http_code}' ...)
 # so the mock appends http_code on a new line too.
 mock_curl() {
+  MOCK_CURL_ARGS_FILE=$(mktemp)
+  export MOCK_CURL_ARGS_FILE
   curl() {
-    MOCK_CURL_LAST_ARGS="$*"
+    printf '%s\n' "$*" >> "$MOCK_CURL_ARGS_FILE"
     local code="${MOCK_CURL_HTTP_CODE:-200}"
     printf '%s\n%s' "${MOCK_CURL_RESPONSE:-}" "$code"
   }
@@ -76,4 +82,18 @@ mock_curl() {
 
 unmock_curl() {
   unset -f curl 2>/dev/null || true
+  if [[ -n "${MOCK_CURL_ARGS_FILE:-}" && -f "$MOCK_CURL_ARGS_FILE" ]]; then
+    rm -f "$MOCK_CURL_ARGS_FILE"
+  fi
+  unset MOCK_CURL_ARGS_FILE
+}
+
+# Return the last recorded curl invocation's args as a single line.
+# Empty string if nothing has been recorded.
+last_curl_args() {
+  if [[ -n "${MOCK_CURL_ARGS_FILE:-}" && -f "$MOCK_CURL_ARGS_FILE" ]]; then
+    tail -n 1 "$MOCK_CURL_ARGS_FILE"
+  else
+    printf ''
+  fi
 }
