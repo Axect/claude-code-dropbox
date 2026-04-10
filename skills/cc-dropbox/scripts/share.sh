@@ -51,7 +51,9 @@ if [[ "$http_code" == "409" ]]; then
     exit 4
   fi
   if [[ "$summary" == shared_link_already_exists* ]]; then
-    list_body=$(jq -nc --arg p "$REMOTE" '{path:$p, direct_only:true}')
+    # direct_only:false — broader match to avoid false "not found" when
+    # create_shared_link_with_settings just reported the link exists.
+    list_body=$(jq -nc --arg p "$REMOTE" '{path:$p, direct_only:false}')
     response=$(curl -sS -w $'\n%{http_code}' \
       -X POST "https://api.dropboxapi.com/2/sharing/list_shared_links" \
       -H "Authorization: Bearer $TOKEN" \

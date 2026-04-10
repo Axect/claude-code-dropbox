@@ -81,3 +81,55 @@ assert_exit_code 0 "$code" "reuse returns 0"
 assert_eq "https://www.dropbox.com/s/existing/file.txt?dl=0" "$out" "returns existing URL"
 assert_eq "2" "$(cat "$MOCK_CURL_CALL_FILE")" "made exactly 2 curl calls"
 unmock_curl
+
+# --- case: generic 409 error (neither path/not_found nor already_exists) ---
+make_tmp_home >/dev/null
+write_creds "{
+  \"app_key\":\"k\",\"app_secret\":\"s\",\"refresh_token\":\"r\",
+  \"access_token\":\"AT\",\"access_token_expires_at\":$future
+}"
+
+MOCK_CURL_RESPONSE='{"error_summary":"email_not_verified/..","error":{".tag":"email_not_verified"}}'
+MOCK_CURL_HTTP_CODE=409
+mock_curl
+
+code=0
+(bash "$SHARE_SH" "/remote/file.txt") >/tmp/cc_out 2>/tmp/cc_err || code=$?
+assert_exit_code 5 "$code" "generic 409 exits 5"
+assert_contains "$(cat /tmp/cc_err)" "HTTP 409" "error names HTTP code"
+assert_contains "$(cat /tmp/cc_err)" "email_not_verified" "error dumps body"
+unmock_curl
+
+# --- case: list_shared_links HTTP failure during reuse fallback ---
+make_tmp_home >/dev/null
+write_creds "{
+  \"app_key\":\"k\",\"app_secret\":\"s\",\"refresh_token\":\"r\",
+  \"access_token\":\"AT\",\"access_token_expires_at\":$future
+}"
+
+# Two-call mock: call 1 returns 409 shared_link_already_exists, call 2 returns 500.
+mock_curl_share_list_fail() {
+  MOCK_CURL_CALL_FILE=$(mktemp)
+  export MOCK_CURL_CALL_FILE
+  printf '0' > "$MOCK_CURL_CALL_FILE"
+  curl() {
+    local n
+    n=$(cat "$MOCK_CURL_CALL_FILE")
+    n=$((n + 1))
+    printf '%s' "$n" > "$MOCK_CURL_CALL_FILE"
+    case "$n" in
+      1) printf '%s\n%s' '{"error_summary":"shared_link_already_exists/..","error":{".tag":"shared_link_already_exists"}}' '409' ;;
+      2) printf '%s\n%s' '{"error_summary":"internal_error"}' '500' ;;
+      *) printf '%s\n%s' '{}' '500' ;;
+    esac
+  }
+  export -f curl
+}
+mock_curl_share_list_fail
+
+code=0
+(bash "$SHARE_SH" "/remote/file.txt") >/tmp/cc_out 2>/tmp/cc_err || code=$?
+assert_exit_code 5 "$code" "list_shared_links 500 exits 5"
+assert_contains "$(cat /tmp/cc_err)" "list_shared_links failed" "error names failing endpoint"
+assert_eq "2" "$(cat "$MOCK_CURL_CALL_FILE")" "made exactly 2 curl calls"
+unmock_curl
