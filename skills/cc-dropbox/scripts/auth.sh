@@ -27,6 +27,10 @@ get_access_token() {
   refresh_token=$(jq -r '.refresh_token' "$CC_DROPBOX_CREDS")
 
   local response body http_code
+  # TODO(security): client_secret is passed via curl argv and is briefly visible
+  # in /proc/<pid>/cmdline on multi-user systems. Acceptable trade-off for a
+  # personal-use plugin; if multi-user support is added, pipe credentials via
+  # stdin instead. Same trade-off in setup.sh exchange_code.
   response=$(curl -sS -w $'\n%{http_code}' \
     -X POST "https://api.dropboxapi.com/oauth2/token" \
     -d "grant_type=refresh_token" \

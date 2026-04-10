@@ -55,5 +55,6 @@ code=0
   exchange_code "k" "s" "code"
 ) >/tmp/cc_out 2>/tmp/cc_err || code=$?
 assert_exit_code 1 "$code" "malformed 200 exits 1"
+assert_contains "$(cat /tmp/cc_err)" "missing required fields" "error names missing fields"
 if [[ ! -f "$HOME/.config/cc-dropbox/credentials.json" ]]; then _pass; else _fail "credentials.json should NOT be created on malformed"; fi
 unmock_curl

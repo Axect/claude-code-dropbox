@@ -6,6 +6,8 @@
 set -uo pipefail
 
 # CC_DROPBOX_CREDS: override credentials path (used by tests and for multi-account setups).
+# Intentionally duplicated from auth.sh — setup.sh must not source auth.sh so
+# that setup can run on a fresh install with no credentials file present.
 CC_DROPBOX_CREDS="${CC_DROPBOX_CREDS:-$HOME/.config/cc-dropbox/credentials.json}"
 
 require_deps() {
@@ -23,6 +25,10 @@ require_deps() {
 exchange_code() {
   local app_key="$1" app_secret="$2" code="$3"
   local response body http_code
+  # TODO(security): client_secret is passed via curl argv and is briefly visible
+  # in /proc/<pid>/cmdline on multi-user systems. Acceptable trade-off for a
+  # personal-use plugin; if multi-user support is added, pipe credentials via
+  # stdin instead. Same trade-off in auth.sh refresh path.
   response=$(curl -sS -w $'\n%{http_code}' \
     -X POST "https://api.dropboxapi.com/oauth2/token" \
     -d "grant_type=authorization_code" \
@@ -74,8 +80,14 @@ exchange_code() {
     echo "cc-dropbox: failed to write credentials.json" >&2
     return 1
   fi
-  mv "$tmp" "$CC_DROPBOX_CREDS"
-  chmod 600 "$CC_DROPBOX_CREDS"
+  if ! mv "$tmp" "$CC_DROPBOX_CREDS"; then
+    rm -f "$tmp"
+    echo "cc-dropbox: failed to install credentials.json" >&2
+    return 1
+  fi
+  chmod 600 "$CC_DROPBOX_CREDS" || \
+    echo "cc-dropbox: warning: chmod 600 failed on $CC_DROPBOX_CREDS" >&2
+  return 0
 }
 
 run_interactive() {
@@ -91,13 +103,18 @@ run_interactive() {
   echo "   - Submit the permissions."
   echo
   read -r -p "App key: " APP_KEY
+  [[ -z "$APP_KEY" ]] && { echo "cc-dropbox: app key is required" >&2; exit 1; }
   read -r -s -p "App secret (hidden): " APP_SECRET; echo
+  [[ -z "$APP_SECRET" ]] && { echo "cc-dropbox: app secret is required" >&2; exit 1; }
   echo
   echo "2. Open this URL in a browser and approve access:"
   echo
   echo "   https://www.dropbox.com/oauth2/authorize?client_id=${APP_KEY}&response_type=code&token_access_type=offline"
   echo
+  echo "   After approving, Dropbox will display an authorization code. Copy it."
+  echo
   read -r -p "Paste the authorization code: " AUTH_CODE
+  [[ -z "$AUTH_CODE" ]] && { echo "cc-dropbox: authorization code is required" >&2; exit 1; }
 
   if exchange_code "$APP_KEY" "$APP_SECRET" "$AUTH_CODE"; then
     echo
