@@ -60,3 +60,26 @@ get_access_token() {
   printf '%s' "$new_access"
   return 0
 }
+
+# api_call <url> <json_body> <bearer_token>
+# Echoes response body on success (HTTP 2xx), exits non-zero on error.
+# On non-2xx: dumps body to stderr, returns 5 (caller may intercept before this
+# via its own response parsing if it needs custom 409 handling).
+api_call() {
+  local url="$1" body="$2" token="$3"
+  local response http_code resp_body
+  response=$(curl -sS -w $'\n%{http_code}' \
+    -X POST "$url" \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/json" \
+    --data "$body")
+  http_code=$(printf '%s' "$response" | tail -n1)
+  resp_body=$(printf '%s' "$response" | sed '$d')
+
+  if [[ "$http_code" =~ ^2 ]]; then
+    printf '%s' "$resp_body"
+    return 0
+  fi
+  echo "cc-dropbox: API error (HTTP $http_code): $resp_body" >&2
+  return 5
+}

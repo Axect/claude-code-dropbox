@@ -93,3 +93,31 @@ code=0
 assert_exit_code 3 "$code" "invalid_grant exits 3"
 assert_contains "$(cat /tmp/cc_err)" "Re-run setup.sh" "error guides user"
 unmock_curl
+
+# --- case: api_call success ---
+MOCK_CURL_RESPONSE='{"ok":true,"value":42}'
+MOCK_CURL_HTTP_CODE=200
+mock_curl
+
+code=0
+out=$(
+  source "$AUTH_SH"
+  api_call "https://api.dropboxapi.com/2/some/endpoint" \
+           '{"k":"v"}' "TESTTOKEN"
+) || code=$?
+assert_exit_code 0 "$code" "api_call 200 returns 0"
+assert_contains "$out" '"value":42' "returns body"
+
+# --- case: api_call non-2xx ---
+MOCK_CURL_RESPONSE='{"error_summary":"path/not_found/"}'
+MOCK_CURL_HTTP_CODE=409
+mock_curl
+
+code=0
+(
+  source "$AUTH_SH"
+  api_call "https://api.dropboxapi.com/2/x" '{}' "T"
+) >/tmp/cc_out 2>/tmp/cc_err || code=$?
+assert_exit_code 5 "$code" "non-2xx exits 5 by default"
+assert_contains "$(cat /tmp/cc_err)" "path/not_found" "dumps raw body"
+unmock_curl
