@@ -53,8 +53,86 @@ single_shot_upload() {
 }
 
 chunked_upload() {
-  echo "cc-dropbox: chunked upload implemented in Task 10." >&2
-  exit 99
+  local total_chunks=$(( (SIZE + CHUNK_SIZE - 1) / CHUNK_SIZE ))
+  local offset=0 session_id="" idx=0
+  local response http_code body arg
+  local chunk_file
+  chunk_file=$(mktemp)
+  trap 'rm -f "$chunk_file"' RETURN
+
+  # --- start: first chunk ---
+  idx=1
+  echo "[$idx/$total_chunks] uploading chunk..." >&2
+  arg=$(jq -nc '{close:false}')
+  dd if="$LOCAL" bs="$CHUNK_SIZE" skip=0 count=1 status=none > "$chunk_file"
+  response=$(curl -sS -w $'\n%{http_code}' \
+    -X POST "https://content.dropboxapi.com/2/files/upload_session/start" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Dropbox-API-Arg: $arg" \
+    -H "Content-Type: application/octet-stream" \
+    --data-binary "@$chunk_file")
+  http_code=$(printf '%s' "$response" | tail -n1)
+  body=$(printf '%s' "$response" | sed '$d')
+  if [[ "$http_code" != "200" ]]; then
+    echo "cc-dropbox: upload_session/start failed (HTTP $http_code): $body" >&2
+    exit 5
+  fi
+  session_id=$(printf '%s' "$body" | jq -r '.session_id')
+  offset=$(( CHUNK_SIZE < SIZE ? CHUNK_SIZE : SIZE ))
+
+  # --- append middle chunks ---
+  while (( offset < SIZE )); do
+    local remaining=$(( SIZE - offset ))
+    if (( remaining <= CHUNK_SIZE )); then
+      break   # last chunk goes via finish
+    fi
+    idx=$((idx + 1))
+    echo "[$idx/$total_chunks] uploading chunk..." >&2
+    arg=$(jq -nc \
+      --arg sid "$session_id" \
+      --argjson off "$offset" \
+      '{cursor:{session_id:$sid, offset:$off}, close:false}')
+    local skip=$(( offset / CHUNK_SIZE ))
+    dd if="$LOCAL" bs="$CHUNK_SIZE" skip="$skip" count=1 status=none > "$chunk_file"
+    response=$(curl -sS -w $'\n%{http_code}' \
+      -X POST "https://content.dropboxapi.com/2/files/upload_session/append_v2" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Dropbox-API-Arg: $arg" \
+      -H "Content-Type: application/octet-stream" \
+      --data-binary "@$chunk_file")
+    http_code=$(printf '%s' "$response" | tail -n1)
+    body=$(printf '%s' "$response" | sed '$d')
+    if [[ "$http_code" != "200" ]]; then
+      echo "cc-dropbox: upload_session/append_v2 failed (HTTP $http_code): $body" >&2
+      exit 5
+    fi
+    offset=$(( offset + CHUNK_SIZE ))
+  done
+
+  # --- finish: last chunk + commit ---
+  idx=$((idx + 1))
+  echo "[$idx/$total_chunks] uploading chunk..." >&2
+  arg=$(jq -nc \
+    --arg sid "$session_id" \
+    --argjson off "$offset" \
+    --arg path "$REMOTE" \
+    '{cursor:{session_id:$sid, offset:$off},
+      commit:{path:$path, mode:"overwrite", autorename:false, mute:false}}')
+  local skip=$(( offset / CHUNK_SIZE ))
+  dd if="$LOCAL" bs="$CHUNK_SIZE" skip="$skip" count=1 status=none > "$chunk_file"
+  response=$(curl -sS -w $'\n%{http_code}' \
+    -X POST "https://content.dropboxapi.com/2/files/upload_session/finish" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Dropbox-API-Arg: $arg" \
+    -H "Content-Type: application/octet-stream" \
+    --data-binary "@$chunk_file")
+  http_code=$(printf '%s' "$response" | tail -n1)
+  body=$(printf '%s' "$response" | sed '$d')
+  if [[ "$http_code" != "200" ]]; then
+    echo "cc-dropbox: upload_session/finish failed (HTTP $http_code): $body" >&2
+    exit 5
+  fi
+  printf '%s' "$body" | jq -c '{path:.path_display, size, content_hash}'
 }
 
 if (( SIZE <= CHUNK_THRESHOLD )); then

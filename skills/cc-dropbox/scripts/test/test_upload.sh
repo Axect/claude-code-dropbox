@@ -51,3 +51,49 @@ code=0
 assert_exit_code 1 "$code" "relative path exits 1"
 assert_contains "$(cat /tmp/cc_err)" "must start with '/'" "error mentions leading slash"
 rm -f "$tmp_file"
+
+# --- case: chunked path is taken when size exceeds threshold ---
+# Use CC_DROPBOX_CHUNK_THRESHOLD=10 + CC_DROPBOX_CHUNK_SIZE=8 to force the
+# chunked path for a 20-byte file (3 chunks: 8, 8, 4).
+make_tmp_home >/dev/null
+write_creds "{
+  \"app_key\":\"k\",\"app_secret\":\"s\",\"refresh_token\":\"r\",
+  \"access_token\":\"AT\",\"access_token_expires_at\":$future
+}"
+
+tmp_file=$(mktemp)
+printf '%s' "0123456789ABCDEFGHIJ" > "$tmp_file"   # 20 bytes
+
+# Multi-call mock: start, append, finish.
+mock_curl_chunked() {
+  # Use a temp file as counter so the state persists even when curl is invoked
+  # inside command substitution $(curl ...) subshells.
+  export MOCK_CURL_CALL_FILE
+  MOCK_CURL_CALL_FILE=$(mktemp)
+  printf '0' > "$MOCK_CURL_CALL_FILE"
+  curl() {
+    local call
+    call=$(( $(cat "$MOCK_CURL_CALL_FILE") + 1 ))
+    printf '%s' "$call" > "$MOCK_CURL_CALL_FILE"
+    case "$call" in
+      1) printf '%s\n%s' '{"session_id":"SID"}' '200' ;;
+      2) printf '%s\n%s' '{}' '200' ;;
+      3) printf '%s\n%s' '{"path_display":"/t/big.bin","size":20,"content_hash":"ZZZ"}' '200' ;;
+      *) printf '%s\n%s' '{}' '200' ;;
+    esac
+  }
+  export -f curl
+}
+mock_curl_chunked
+
+code=0
+out=$(
+  CC_DROPBOX_CHUNK_THRESHOLD=10 CC_DROPBOX_CHUNK_SIZE=8 \
+    bash "$UPLOAD_SH" "$tmp_file" "/t/big.bin"
+) || code=$?
+assert_exit_code 0 "$code" "chunked returns 0"
+assert_contains "$out" '"path":"/t/big.bin"' "chunked summary path"
+assert_contains "$out" '"size":20' "chunked summary size"
+assert_contains "$out" '"content_hash":"ZZZ"' "chunked summary hash"
+unmock_curl
+rm -f "$tmp_file"

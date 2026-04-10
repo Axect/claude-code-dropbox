@@ -90,6 +90,10 @@ unmock_curl() {
     rm -f "$MOCK_CURL_ARGS_FILE"
   fi
   unset MOCK_CURL_ARGS_FILE
+  if [[ -n "${MOCK_CURL_CALL_FILE:-}" && -f "$MOCK_CURL_CALL_FILE" ]]; then
+    rm -f "$MOCK_CURL_CALL_FILE"
+  fi
+  unset MOCK_CURL_CALL_FILE
 }
 
 # Return the last recorded curl invocation's args as a single line.
