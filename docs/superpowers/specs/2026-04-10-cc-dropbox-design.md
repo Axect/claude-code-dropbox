@@ -166,7 +166,7 @@ get_access_token():
 3. Branch on response:
    - **200 OK:** extract `.url`.
    - **409 `shared_link_already_exists`:** `POST /2/sharing/list_shared_links`
-     with `{"path":"<dropbox_path>","direct_only":true}` → `.links[0].url`.
+     with `{"path":"<dropbox_path>","direct_only":false}` → `.links[0].url`.
    - **409 `path/not_found`:** exit 4.
    - **Other error:** dump raw response to stderr, exit 5.
 4. Print URL on stdout (as-is; `?dl=0` preview form — user can post-process if they want `?dl=1`).
@@ -174,12 +174,12 @@ get_access_token():
 ### 6.4 Shared helper (`auth.sh`)
 
 ```
-api_call <endpoint> <json_body>:
-  curl -sS -X POST \
-    -H "Authorization: Bearer $TOKEN" \
+api_call <url> <json_body> <bearer_token>:
+  curl -sS -X POST -H "Authorization: Bearer <bearer_token>" \
     -H "Content-Type: application/json" \
-    --data "$json_body" "$endpoint"
-  On HTTP error: stderr dump + exit.
+    --data "<json_body>" "<url>"
+  On 2xx: echo body, return 0.
+  On non-2xx: stderr dump, return 5.
 ```
 
 ## 7. Error handling policy
