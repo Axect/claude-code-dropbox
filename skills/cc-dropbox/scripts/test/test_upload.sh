@@ -95,5 +95,31 @@ assert_exit_code 0 "$code" "chunked returns 0"
 assert_contains "$out" '"path":"/t/big.bin"' "chunked summary path"
 assert_contains "$out" '"size":20' "chunked summary size"
 assert_contains "$out" '"content_hash":"ZZZ"' "chunked summary hash"
+assert_eq "3" "$(cat "$MOCK_CURL_CALL_FILE")" "chunked made exactly 3 curl calls"
 unmock_curl
 rm -f "$tmp_file"
+
+# --- case: chunked upload_session/start returns non-200 ---
+make_tmp_home >/dev/null
+write_creds "{
+  \"app_key\":\"k\",\"app_secret\":\"s\",\"refresh_token\":\"r\",
+  \"access_token\":\"AT\",\"access_token_expires_at\":$future
+}"
+
+tmp_file=$(mktemp)
+printf '%s' "0123456789ABCDEFGHIJ" > "$tmp_file"   # 20 bytes
+
+MOCK_CURL_RESPONSE='{"error_summary":"server_error/."}'
+MOCK_CURL_HTTP_CODE=500
+mock_curl
+
+code=0
+(
+  CC_DROPBOX_CHUNK_THRESHOLD=10 CC_DROPBOX_CHUNK_SIZE=8 \
+    bash "$UPLOAD_SH" "$tmp_file" "/t/big.bin"
+) >/tmp/cc_upload_out 2>/tmp/cc_upload_err || code=$?
+
+assert_exit_code 5 "$code" "chunked start failure exits 5"
+assert_contains "$(cat /tmp/cc_upload_err)" "upload_session/start failed" "error names failing endpoint"
+unmock_curl
+rm -f "$tmp_file" /tmp/cc_upload_out /tmp/cc_upload_err
