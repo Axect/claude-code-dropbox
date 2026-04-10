@@ -1,0 +1,6 @@
+{
+  "name": "cc-dropbox",
+  "version": "0.1.0",
+  "description": "Dropbox file operations (upload/download/share) for Claude Code",
+  "author": "axect"
+}
