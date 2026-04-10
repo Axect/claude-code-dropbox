@@ -37,3 +37,37 @@ out=$(
 assert_exit_code 0 "$code" "cached path returns 0"
 assert_eq "cached_token" "$out" "returns cached token"
 unmock_curl
+
+# --- case: expired token triggers refresh ---
+make_tmp_home >/dev/null
+past=$(( $(date +%s) - 100 ))
+write_creds "{
+  \"app_key\":\"k\",\"app_secret\":\"s\",\"refresh_token\":\"r\",
+  \"access_token\":\"old\",\"access_token_expires_at\":$past
+}"
+
+MOCK_CURL_RESPONSE='{"access_token":"fresh_token","expires_in":14400,"token_type":"bearer"}'
+MOCK_CURL_HTTP_CODE=200
+mock_curl
+
+code=0
+out=$(
+  source "$AUTH_SH"
+  get_access_token
+) || code=$?
+
+assert_exit_code 0 "$code" "refresh returns 0"
+assert_eq "fresh_token" "$out" "returns new access token"
+
+# Verify credentials.json was updated.
+new_token=$(jq -r '.access_token' "$HOME/.config/cc-dropbox/credentials.json")
+assert_eq "fresh_token" "$new_token" "credentials.json updated"
+
+new_exp=$(jq -r '.access_token_expires_at' "$HOME/.config/cc-dropbox/credentials.json")
+now=$(date +%s)
+if (( new_exp > now + 14000 && new_exp < now + 14500 )); then
+  _pass
+else
+  _fail "expires_at not in expected window: $new_exp (now=$now)"
+fi
+unmock_curl
