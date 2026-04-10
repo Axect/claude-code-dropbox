@@ -1,6 +1,7 @@
 # shellcheck shell=bash
 # Sourceable library. Provides: get_access_token, api_call.
 
+# CC_DROPBOX_CREDS: override credentials path (used by tests and for multi-account setups).
 CC_DROPBOX_CREDS="${CC_DROPBOX_CREDS:-$HOME/.config/cc-dropbox/credentials.json}"
 
 get_access_token() {
@@ -44,16 +45,33 @@ get_access_token() {
     return 5
   fi
 
+  if ! printf '%s' "$body" | jq empty >/dev/null 2>&1; then
+    echo "cc-dropbox: refresh response is not valid JSON: $body" >&2
+    return 5
+  fi
+
   local new_access new_expires_in new_expires_at
   new_access=$(printf '%s' "$body" | jq -r '.access_token')
   new_expires_in=$(printf '%s' "$body" | jq -r '.expires_in')
+
+  if [[ -z "$new_access" || "$new_access" == "null" \
+     || -z "$new_expires_in" || "$new_expires_in" == "null" \
+     || ! "$new_expires_in" =~ ^[0-9]+$ ]]; then
+    echo "cc-dropbox: refresh response missing required fields" >&2
+    return 5
+  fi
+
   new_expires_at=$(( now + new_expires_in ))
 
   local tmp
-  tmp=$(mktemp)
-  jq --arg tok "$new_access" --argjson exp "$new_expires_at" \
-    '.access_token = $tok | .access_token_expires_at = $exp' \
-    "$CC_DROPBOX_CREDS" > "$tmp"
+  tmp=$(mktemp "${CC_DROPBOX_CREDS}.XXXXXX")
+  if ! jq --arg tok "$new_access" --argjson exp "$new_expires_at" \
+       '.access_token = $tok | .access_token_expires_at = $exp' \
+       "$CC_DROPBOX_CREDS" > "$tmp"; then
+    rm -f "$tmp"
+    echo "cc-dropbox: failed to update credentials.json" >&2
+    return 5
+  fi
   mv "$tmp" "$CC_DROPBOX_CREDS"
   chmod 600 "$CC_DROPBOX_CREDS"
 
@@ -62,9 +80,12 @@ get_access_token() {
 }
 
 # api_call <url> <json_body> <bearer_token>
-# Echoes response body on success (HTTP 2xx), exits non-zero on error.
-# On non-2xx: dumps body to stderr, returns 5 (caller may intercept before this
-# via its own response parsing if it needs custom 409 handling).
+# On 2xx: echoes response body to stdout, returns 0.
+# On non-2xx: dumps "API error (HTTP <code>): <body>" to stderr, returns 5.
+#
+# Callers that need to branch on specific 409 error_summary values
+# (e.g. share.sh distinguishing shared_link_already_exists from path/not_found)
+# must call curl directly rather than via this helper.
 api_call() {
   local url="$1" body="$2" token="$3"
   local response http_code resp_body

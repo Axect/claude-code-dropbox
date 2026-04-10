@@ -121,3 +121,54 @@ code=0
 assert_exit_code 5 "$code" "non-2xx exits 5 by default"
 assert_contains "$(cat /tmp/cc_err)" "path/not_found" "dumps raw body"
 unmock_curl
+
+# --- case: refresh returns HTTP 200 but malformed/missing fields ---
+make_tmp_home >/dev/null
+past=$(( $(date +%s) - 100 ))
+write_creds "{
+  \"app_key\":\"k\",\"app_secret\":\"s\",\"refresh_token\":\"r\",
+  \"access_token\":\"old\",\"access_token_expires_at\":$past
+}"
+
+MOCK_CURL_RESPONSE='{"not_a_token":"oops"}'
+MOCK_CURL_HTTP_CODE=200
+mock_curl
+
+code=0
+(
+  source "$AUTH_SH"
+  get_access_token
+) >/tmp/cc_out 2>/tmp/cc_err || code=$?
+
+assert_exit_code 5 "$code" "malformed 200 response exits 5"
+assert_contains "$(cat /tmp/cc_err)" "missing required fields" "error names the problem"
+
+# Verify credentials.json is unchanged (still has old access_token and past expires_at).
+preserved_token=$(jq -r '.access_token' "$HOME/.config/cc-dropbox/credentials.json")
+assert_eq "old" "$preserved_token" "credentials.json access_token untouched"
+preserved_exp=$(jq -r '.access_token_expires_at' "$HOME/.config/cc-dropbox/credentials.json")
+assert_eq "$past" "$preserved_exp" "credentials.json expires_at untouched"
+unmock_curl
+
+# --- case: refresh returns HTTP 200 with non-JSON body ---
+make_tmp_home >/dev/null
+write_creds "{
+  \"app_key\":\"k\",\"app_secret\":\"s\",\"refresh_token\":\"r\",
+  \"access_token\":\"old\",\"access_token_expires_at\":$past
+}"
+
+MOCK_CURL_RESPONSE='<html>Captive portal login required</html>'
+MOCK_CURL_HTTP_CODE=200
+mock_curl
+
+code=0
+(
+  source "$AUTH_SH"
+  get_access_token
+) >/tmp/cc_out 2>/tmp/cc_err || code=$?
+
+assert_exit_code 5 "$code" "non-JSON 200 response exits 5"
+assert_contains "$(cat /tmp/cc_err)" "not valid JSON" "error names non-JSON"
+preserved_token=$(jq -r '.access_token' "$HOME/.config/cc-dropbox/credentials.json")
+assert_eq "old" "$preserved_token" "non-JSON case: access_token untouched"
+unmock_curl
