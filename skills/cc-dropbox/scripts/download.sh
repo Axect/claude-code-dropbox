@@ -25,19 +25,34 @@ if [[ -z "$LOCAL" ]]; then
   LOCAL="$(basename "$REMOTE")"
 fi
 
-if [[ -e "$LOCAL" ]]; then
+# -e misses dangling symlinks; -L catches any symlink (dangling or not).
+# Refuse if the destination exists OR is a symlink, to avoid curl --output
+# following a planted symlink to an unintended target.
+if [[ -e "$LOCAL" || -L "$LOCAL" ]]; then
   echo "cc-dropbox: File exists: $LOCAL. Remove it or specify a different destination." >&2
+  exit 1
+fi
+
+parent_dir=$(dirname "$LOCAL")
+if [[ ! -d "$parent_dir" ]]; then
+  echo "cc-dropbox: parent directory does not exist: $parent_dir" >&2
   exit 1
 fi
 
 TOKEN=$(get_access_token) || exit $?
 
 arg=$(jq -nc --arg path "$REMOTE" '{path:$path}')
+curl_rc=0
 response=$(curl -sS -w $'\n%{http_code}' \
   -X POST "https://content.dropboxapi.com/2/files/download" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Dropbox-API-Arg: $arg" \
-  --output "$LOCAL")
+  --output "$LOCAL") || curl_rc=$?
+if [[ $curl_rc -ne 0 ]]; then
+  rm -f "$LOCAL"
+  echo "cc-dropbox: curl failed (exit $curl_rc) writing to $LOCAL" >&2
+  exit "$curl_rc"
+fi
 http_code=$(printf '%s' "$response" | tail -n1)
 
 if [[ "$http_code" == "200" ]]; then
