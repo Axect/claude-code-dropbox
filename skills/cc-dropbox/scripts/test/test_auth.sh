@@ -71,3 +71,25 @@ else
   _fail "expires_at not in expected window: $new_exp (now=$now)"
 fi
 unmock_curl
+
+# --- case: refresh returns invalid_grant ---
+make_tmp_home >/dev/null
+past=$(( $(date +%s) - 100 ))
+write_creds "{
+  \"app_key\":\"k\",\"app_secret\":\"s\",\"refresh_token\":\"r\",
+  \"access_token\":\"old\",\"access_token_expires_at\":$past
+}"
+
+MOCK_CURL_RESPONSE='{"error":"invalid_grant","error_description":"refresh token is invalid"}'
+MOCK_CURL_HTTP_CODE=400
+mock_curl
+
+code=0
+(
+  source "$AUTH_SH"
+  get_access_token
+) >/tmp/cc_out 2>/tmp/cc_err || code=$?
+
+assert_exit_code 3 "$code" "invalid_grant exits 3"
+assert_contains "$(cat /tmp/cc_err)" "Re-run setup.sh" "error guides user"
+unmock_curl
