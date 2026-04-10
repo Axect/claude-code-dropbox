@@ -72,6 +72,10 @@ write_creds() {
 mock_curl() {
   MOCK_CURL_ARGS_FILE=$(mktemp)
   export MOCK_CURL_ARGS_FILE
+  # Export response vars so the mock function works in child bash processes
+  # (e.g. when a script under test is invoked via `bash script.sh`).
+  export MOCK_CURL_RESPONSE="${MOCK_CURL_RESPONSE:-}"
+  export MOCK_CURL_HTTP_CODE="${MOCK_CURL_HTTP_CODE:-200}"
   curl() {
     printf '%s\n' "$*" >> "$MOCK_CURL_ARGS_FILE"
     local code="${MOCK_CURL_HTTP_CODE:-200}"
