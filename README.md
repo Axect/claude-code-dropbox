@@ -10,35 +10,20 @@ It follows the Agent Skills directory format, so the same repository can be inst
 
 ## TL;DR
 
-### Claude Code
+1. Install this repository as a skill directory for your agent.
+2. Run the one-time OAuth bootstrap:
 
 ```bash
-mkdir -p ~/.claude/skills
-ln -s /path/to/dropbox-skill ~/.claude/skills/dropbox-skill
 bash scripts/setup.sh
 ```
 
-### Codex
-
-```bash
-mkdir -p ~/.codex/skills
-ln -s /path/to/dropbox-skill ~/.codex/skills/dropbox-skill
-bash scripts/setup.sh
-```
-
-### Forge
-
-```bash
-mkdir -p ~/forge/skills
-ln -s /path/to/dropbox-skill ~/forge/skills/dropbox-skill
-bash scripts/setup.sh
-```
-
-Then ask your agent things like:
+3. Ask your agent things like:
 
 - `Upload ./report.pdf to /Papers/report.pdf in Dropbox`
 - `Download /Papers/draft.pdf from Dropbox`
 - `Make a shared link for /Papers/report.pdf`
+
+For client-specific install commands, see [Installation](#installation).
 
 ## Why this skill?
 
