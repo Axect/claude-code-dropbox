@@ -10,18 +10,35 @@ It follows the Agent Skills directory format, so the same repository can be inst
 
 ## TL;DR
 
+### Claude Code
+
 ```bash
-# Install as a skill directory
-mkdir -p ~/.forge/skills
-ln -s /path/to/dropbox-skill ~/.forge/skills/dropbox-skill
-
-# One-time Dropbox OAuth setup
+mkdir -p ~/.claude/skills
+ln -s /path/to/dropbox-skill ~/.claude/skills/dropbox-skill
 bash scripts/setup.sh
-
-# Then ask your agent things like:
-# - "Upload ./report.pdf to /Papers/report.pdf in Dropbox"
-# - "Make a shared link for /Papers/report.pdf"
 ```
+
+### Codex
+
+```bash
+mkdir -p ~/.codex/skills
+ln -s /path/to/dropbox-skill ~/.codex/skills/dropbox-skill
+bash scripts/setup.sh
+```
+
+### Forge
+
+```bash
+mkdir -p ~/forge/skills
+ln -s /path/to/dropbox-skill ~/forge/skills/dropbox-skill
+bash scripts/setup.sh
+```
+
+Then ask your agent things like:
+
+- `Upload ./report.pdf to /Papers/report.pdf in Dropbox`
+- `Download /Papers/draft.pdf from Dropbox`
+- `Make a shared link for /Papers/report.pdf`
 
 ## Why this skill?
 
@@ -55,16 +72,6 @@ This repository is packaged as a standard Agent Skills directory: the repository
 
 Choose the install style that matches your agent.
 
-### Forge user-level install
-
-```bash
-mkdir -p ~/forge/skills
-cd ~/forge/skills
-git clone https://github.com/Axect/dropbox-skill.git
-```
-
-Forge will discover the skill at `~/forge/skills/dropbox-skill/SKILL.md`.
-
 ### Claude Code personal install
 
 ```bash
@@ -74,6 +81,26 @@ git clone https://github.com/Axect/dropbox-skill.git
 ```
 
 Claude Code will discover the skill at `~/.claude/skills/dropbox-skill/SKILL.md`.
+
+### Codex personal install
+
+```bash
+mkdir -p ~/.codex/skills
+cd ~/.codex/skills
+git clone https://github.com/Axect/dropbox-skill.git
+```
+
+Codex-style clients can discover the skill at `~/.codex/skills/dropbox-skill/SKILL.md` if configured to load user-level skills from that directory.
+
+### Forge user-level install
+
+```bash
+mkdir -p ~/forge/skills
+cd ~/forge/skills
+git clone https://github.com/Axect/dropbox-skill.git
+```
+
+Forge will discover the skill at `~/forge/skills/dropbox-skill/SKILL.md`.
 
 ### Project-local install
 
