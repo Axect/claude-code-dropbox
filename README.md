@@ -89,10 +89,18 @@ Forge will discover the skill at `~/forge/skills/dropbox-skill/SKILL.md`.
 
 ### Project-local install
 
+If your agent supports project-scoped skills, clone this repository into that project's local skills directory using the convention your client expects.
+
+Common examples include client-specific paths such as `.claude/skills`, `.codex/skills`, or another project-local skills directory configured by your agent.
+
 ```bash
-mkdir -p .claude/skills
-git clone https://github.com/Axect/dropbox-skill.git .claude/skills/dropbox-skill
+mkdir -p <project-skill-dir>
+git clone https://github.com/Axect/dropbox-skill.git <project-skill-dir>/dropbox-skill
 ```
+
+Replace `<project-skill-dir>` with the actual project-local skills path for your client.
+
+The key requirement is that the checked-out directory is named `dropbox-skill` and contains `SKILL.md` at its root.
 
 ### Other Agent Skills-compatible clients
 
