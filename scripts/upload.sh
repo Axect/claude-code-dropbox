@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cc-dropbox upload: upload a local file to Dropbox.
+# dropbox-skill upload: upload a local file to Dropbox.
 # Usage: upload.sh <local_path> <dropbox_path>
 set -uo pipefail
 
@@ -7,8 +7,8 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=./auth.sh
 source "$SCRIPT_DIR/auth.sh"
 
-CHUNK_THRESHOLD="${CC_DROPBOX_CHUNK_THRESHOLD:-$((150 * 1024 * 1024))}"
-CHUNK_SIZE="${CC_DROPBOX_CHUNK_SIZE:-$((8 * 1024 * 1024))}"
+CHUNK_THRESHOLD="${DROPBOX_SKILL_CHUNK_THRESHOLD:-${CC_DROPBOX_CHUNK_THRESHOLD:-$((150 * 1024 * 1024))}}"
+CHUNK_SIZE="${DROPBOX_SKILL_CHUNK_SIZE:-${CC_DROPBOX_CHUNK_SIZE:-$((8 * 1024 * 1024))}}"
 
 usage() {
   echo "Usage: upload.sh <local_path> <dropbox_path>" >&2
@@ -20,11 +20,11 @@ LOCAL="$1"
 REMOTE="$2"
 
 if [[ "${REMOTE:0:1}" != "/" ]]; then
-  echo "cc-dropbox: dropbox path must start with '/': $REMOTE" >&2
+  echo "dropbox-skill: dropbox path must start with '/': $REMOTE" >&2
   exit 1
 fi
 if [[ ! -r "$LOCAL" ]]; then
-  echo "cc-dropbox: Cannot read local file: $LOCAL" >&2
+  echo "dropbox-skill: Cannot read local file: $LOCAL" >&2
   exit 1
 fi
 
@@ -46,7 +46,7 @@ single_shot_upload() {
   http_code=$(printf '%s' "$response" | tail -n1)
   body=$(printf '%s' "$response" | sed '$d')
   if [[ "$http_code" != "200" ]]; then
-    echo "cc-dropbox: upload failed (HTTP $http_code): $body" >&2
+    echo "dropbox-skill: upload failed (HTTP $http_code): $body" >&2
     exit 5
   fi
   printf '%s' "$body" | jq -c '{path:.path_display, size, content_hash}'
@@ -74,7 +74,7 @@ chunked_upload() {
   http_code=$(printf '%s' "$response" | tail -n1)
   body=$(printf '%s' "$response" | sed '$d')
   if [[ "$http_code" != "200" ]]; then
-    echo "cc-dropbox: upload_session/start failed (HTTP $http_code): $body" >&2
+    echo "dropbox-skill: upload_session/start failed (HTTP $http_code): $body" >&2
     exit 5
   fi
   session_id=$(printf '%s' "$body" | jq -r '.session_id')
@@ -103,7 +103,7 @@ chunked_upload() {
     http_code=$(printf '%s' "$response" | tail -n1)
     body=$(printf '%s' "$response" | sed '$d')
     if [[ "$http_code" != "200" ]]; then
-      echo "cc-dropbox: upload_session/append_v2 failed (HTTP $http_code): $body" >&2
+      echo "dropbox-skill: upload_session/append_v2 failed (HTTP $http_code): $body" >&2
       exit 5
     fi
     offset=$(( offset + CHUNK_SIZE ))
@@ -129,7 +129,7 @@ chunked_upload() {
   http_code=$(printf '%s' "$response" | tail -n1)
   body=$(printf '%s' "$response" | sed '$d')
   if [[ "$http_code" != "200" ]]; then
-    echo "cc-dropbox: upload_session/finish failed (HTTP $http_code): $body" >&2
+    echo "dropbox-skill: upload_session/finish failed (HTTP $http_code): $body" >&2
     exit 5
   fi
   printf '%s' "$body" | jq -c '{path:.path_display, size, content_hash}'

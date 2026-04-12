@@ -17,7 +17,7 @@ code=0
 ) || code=$?
 assert_exit_code 0 "$code" "exchange_code returns 0"
 
-creds="$HOME/.config/cc-dropbox/credentials.json"
+creds="$HOME/.config/dropbox-skill/credentials.json"
 if [[ -f "$creds" ]]; then _pass; else _fail "credentials.json not created"; fi
 assert_eq "app_k" "$(jq -r .app_key "$creds")" "app_key stored"
 assert_eq "app_s" "$(jq -r .app_secret "$creds")" "app_secret stored"
@@ -40,7 +40,7 @@ code=0
 ) >/tmp/cc_out 2>/tmp/cc_err || code=$?
 assert_exit_code 1 "$code" "non-2xx exits 1"
 assert_contains "$(cat /tmp/cc_err)" "token exchange failed" "error names failure"
-if [[ ! -f "$HOME/.config/cc-dropbox/credentials.json" ]]; then _pass; else _fail "credentials.json should NOT be created on failure"; fi
+if [[ ! -f "$HOME/.config/dropbox-skill/credentials.json" ]]; then _pass; else _fail "credentials.json should NOT be created on failure"; fi
 unmock_curl
 
 # --- case: exchange_code validates response has required fields ---
@@ -56,5 +56,5 @@ code=0
 ) >/tmp/cc_out 2>/tmp/cc_err || code=$?
 assert_exit_code 1 "$code" "malformed 200 exits 1"
 assert_contains "$(cat /tmp/cc_err)" "missing required fields" "error names missing fields"
-if [[ ! -f "$HOME/.config/cc-dropbox/credentials.json" ]]; then _pass; else _fail "credentials.json should NOT be created on malformed"; fi
+if [[ ! -f "$HOME/.config/dropbox-skill/credentials.json" ]]; then _pass; else _fail "credentials.json should NOT be created on malformed"; fi
 unmock_curl

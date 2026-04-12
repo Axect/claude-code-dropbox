@@ -1,9 +1,11 @@
 ---
-name: cc-dropbox
-description: Upload files to Dropbox, download from Dropbox, and create/retrieve shared links. Use when the user mentions Dropbox, asks to upload/download/share a file via Dropbox, or wants a shareable link for a file already in their Dropbox.
+name: dropbox-skill
+description: Upload files to Dropbox, download from Dropbox, and create or reuse shared links. Use when the user mentions Dropbox, asks to upload/download/share a file via Dropbox, or wants a shareable link for a file already in Dropbox.
+license: MIT
+compatibility: Agent Skills-compatible clients with shell access, bash 4+, curl, jq, Dropbox API network access, and the ability to execute files from this skill directory.
 ---
 
-# cc-dropbox
+# dropbox-skill
 
 Dropbox file operations via Dropbox HTTP API v2. Unifies upload, download, and shared-link operations.
 
@@ -13,13 +15,13 @@ Invoke this skill when the user says any of:
 - "upload X to Dropbox" → use `scripts/upload.sh`
 - "download X from Dropbox" / "get X from Dropbox" → `scripts/download.sh`
 - "share link", "shared link", "Dropbox link", "make a link for X" → `scripts/share.sh`
-- "set up Dropbox", "configure Dropbox", or when `~/.config/cc-dropbox/credentials.json` does not exist → `scripts/setup.sh`
+- "set up Dropbox", "configure Dropbox", or when `~/.config/dropbox-skill/credentials.json` does not exist → `scripts/setup.sh`
 
 ## Prerequisites (check before any operation)
 
 Before running upload/download/share, verify the credentials file exists:
 
-    test -f ~/.config/cc-dropbox/credentials.json
+    test -f ~/.config/dropbox-skill/credentials.json
 
 If it does not exist, tell the user:
 > Dropbox is not set up yet. I can run the setup flow — it will ask for your app key, app secret, and an authorization code from a browser URL. Proceed?
@@ -33,22 +35,24 @@ Only run `setup.sh` after the user confirms.
 
 ## Script usage
 
+All scripts live in this skill directory's `scripts/` folder. If your client exposes the skill directory path (for example Claude Code via `CLAUDE_SKILL_DIR`), use it. Otherwise resolve the script path relative to this `SKILL.md` file.
+
 ### setup.sh
 Interactive one-time bootstrap. Takes stdin input for app key, app secret, and authorization code.
 
-    bash skills/cc-dropbox/scripts/setup.sh
+    bash scripts/setup.sh
 
 ### upload.sh
 Upload local → Dropbox. Auto-chooses single-shot vs chunked session based on file size.
 
-    bash skills/cc-dropbox/scripts/upload.sh <local_path> <dropbox_path>
+    bash scripts/upload.sh <local_path> <dropbox_path>
 
 Prints a one-line JSON summary on success: `{"path":"...","size":N,"content_hash":"..."}`
 
 ### download.sh
 Download Dropbox → local. Refuses to overwrite existing local files.
 
-    bash skills/cc-dropbox/scripts/download.sh <dropbox_path> [<local_path>]
+    bash scripts/download.sh <dropbox_path> [<local_path>]
 
 If `<local_path>` is omitted, uses `basename <dropbox_path>` in the current directory.
 Prints the saved path on stdout.
@@ -56,7 +60,7 @@ Prints the saved path on stdout.
 ### share.sh
 Create (or retrieve existing) shared link.
 
-    bash skills/cc-dropbox/scripts/share.sh <dropbox_path>
+    bash scripts/share.sh <dropbox_path>
 
 Prints the URL on stdout.
 

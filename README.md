@@ -1,30 +1,37 @@
-# claude-code-dropbox
+# dropbox-skill
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-88%20passing-brightgreen.svg)](skills/cc-dropbox/scripts/test/)
+[![Tests](https://img.shields.io/badge/tests-88%20passing-brightgreen.svg)](scripts/test/)
 
-A Claude Code plugin that unifies Dropbox file operations — **upload**, **download**, and **shared link** — into one skill. Claude invokes bash scripts in response to natural-language requests like "upload this PDF to Dropbox" or "make a share link for `/Papers/draft.pdf`".
+A portable Dropbox skill for AI agents that turns natural-language requests into three dependable operations: **upload a file**, **download a file**, and **create or reuse a shared link**.
+
+It follows the Agent Skills directory format, so the same repository can be installed in Forge, Claude Code, and other compatible clients that can read `SKILL.md` and run bundled bash scripts.
 
 ## TL;DR
 
 ```bash
-# 1. Install as a Claude Code plugin (see Installation below)
-# 2. One-time setup: register a Dropbox app, then run:
-bash skills/cc-dropbox/scripts/setup.sh
-# 3. Talk to Claude:
-#    "Upload this PDF to /Papers/report.pdf on Dropbox"
-#    "Make a share link for /Papers/report.pdf"
+# Install as a skill directory
+mkdir -p ~/.forge/skills
+ln -s /path/to/dropbox-skill ~/.forge/skills/dropbox-skill
+
+# One-time Dropbox OAuth setup
+bash scripts/setup.sh
+
+# Then ask your agent things like:
+# - "Upload ./report.pdf to /Papers/report.pdf in Dropbox"
+# - "Make a shared link for /Papers/report.pdf"
 ```
 
-## Why this plugin?
+## Why this skill?
 
-Dropbox's own CLI is feature-rich but heavy for the common case of "push a file, get a link." This plugin gives Claude Code a minimal, auditable bash-only path for the three operations that come up most often in research and writing workflows:
+Dropbox's official tooling is powerful, but often heavier than the common agent workflow of "put this file in Dropbox" or "give me a link I can share." This skill keeps that path small, readable, and portable:
 
-- You stay in your editor — no context switch to a browser or GUI client.
-- Claude handles the phrasing (path resolution, reusing existing share links, picking upload strategy by file size).
-- The implementation is ~500 lines of bash you can read in one sitting. Nothing hides behind a runtime.
-- Credentials live in `~/.config/cc-dropbox/credentials.json` (`chmod 600`), refreshed on demand via OAuth2. No long-lived tokens.
+- **Natural-language friendly** — the agent maps user intent to upload, download, or share operations.
+- **Portable by design** — one `SKILL.md`, one `scripts/` directory, no framework lock-in.
+- **Auditable implementation** — the behavior lives in bash scripts you can inspect end to end.
+- **Practical auth model** — credentials live in `~/.config/dropbox-skill/credentials.json` with refresh-token based access-token renewal.
+- **Backwards compatible** — legacy credentials at `~/.config/cc-dropbox/credentials.json` are still accepted if present.
 
 ## Features
 
@@ -44,21 +51,49 @@ Dropbox's own CLI is feature-rich but heavy for the common case of "push a file,
 
 ## Installation
 
-Install as a Claude Code plugin from the GitHub repo:
+This repository is packaged as a standard Agent Skills directory: the repository root is the skill directory, `SKILL.md` is the entrypoint, and the bundled scripts live in `scripts/`.
 
-```
-/plugin install Axect/claude-code-dropbox
-```
+Choose the install style that matches your agent.
 
-Claude will pick up `skills/cc-dropbox/SKILL.md` automatically.
-
-Alternatively, clone the repo and source the scripts directly:
+### Forge user-level install
 
 ```bash
-git clone https://github.com/Axect/claude-code-dropbox.git
-cd claude-code-dropbox
-bash skills/cc-dropbox/scripts/setup.sh
+mkdir -p ~/forge/skills
+cd ~/forge/skills
+git clone https://github.com/Axect/dropbox-skill.git
 ```
+
+Forge will discover the skill at `~/forge/skills/dropbox-skill/SKILL.md`.
+
+### Claude Code personal install
+
+```bash
+mkdir -p ~/.claude/skills
+cd ~/.claude/skills
+git clone https://github.com/Axect/dropbox-skill.git
+```
+
+Claude Code will discover the skill at `~/.claude/skills/dropbox-skill/SKILL.md`.
+
+### Project-local install
+
+```bash
+mkdir -p .claude/skills
+git clone https://github.com/Axect/dropbox-skill.git .claude/skills/dropbox-skill
+```
+
+### Other Agent Skills-compatible clients
+
+Copy or clone this repository so the skill directory itself is named `dropbox-skill` and contains `SKILL.md` at its root.
+
+```text
+dropbox-skill/
+├── SKILL.md
+├── scripts/
+└── LICENSE
+```
+
+If your client supports the Agent Skills open standard, point it at that directory or place it inside the client's configured skills folder.
 
 ## Setup (one time)
 
@@ -66,7 +101,7 @@ bash skills/cc-dropbox/scripts/setup.sh
 2. Choose:
    - **API:** Scoped access
    - **Access type:** Full Dropbox
-   - **Name:** anything (e.g. `claude-code-skill`)
+   - **Name:** anything (e.g. `dropbox-skill-demo`)
 3. On the app page, open the **Permissions** tab and enable:
    - `files.content.write`
    - `files.content.read`
@@ -78,35 +113,36 @@ bash skills/cc-dropbox/scripts/setup.sh
 5. Run the setup script:
 
    ```bash
-   bash skills/cc-dropbox/scripts/setup.sh
+   bash scripts/setup.sh
    ```
 
-   Or just tell Claude: *"set up Dropbox"*.
+   Or just tell your agent: *"set up Dropbox"*.
 
    The script will:
    - Prompt for your app key and app secret (secret is hidden).
    - Print a URL to open in a browser for OAuth authorization.
    - Prompt you to paste the authorization code Dropbox displays.
-   - Exchange the code for an access + refresh token and save them to `~/.config/cc-dropbox/credentials.json` (`chmod 600`).
+   - Exchange the code for an access + refresh token and save them to `~/.config/dropbox-skill/credentials.json` (`chmod 600`).
 
-## Usage (via Claude)
+## Usage (via an agent)
 
-Just talk to Claude:
+Ask any compatible agent in natural language:
 
 - *"Upload `./report.pdf` to `/Papers/report.pdf` in Dropbox."*
 - *"Download `/Papers/draft.pdf` from Dropbox."*
 - *"Make a share link for `/Papers/draft.pdf`."*
+- *"Download `/Research/data.tar.zst` from Dropbox to `./data.tar.zst`."*
 
-Claude reads `skills/cc-dropbox/SKILL.md`, picks the right script, and surfaces the output.
+The agent reads `SKILL.md`, chooses the right script, and returns the result.
 
 ## Usage (direct)
 
 You can also call the scripts directly from a shell:
 
 ```bash
-bash skills/cc-dropbox/scripts/upload.sh   ./report.pdf   /Papers/report.pdf
-bash skills/cc-dropbox/scripts/download.sh /Papers/draft.pdf
-bash skills/cc-dropbox/scripts/share.sh    /Papers/draft.pdf
+bash scripts/upload.sh   ./report.pdf   /Papers/report.pdf
+bash scripts/download.sh /Papers/draft.pdf
+bash scripts/share.sh    /Papers/draft.pdf
 ```
 
 ### Example output
@@ -114,21 +150,21 @@ bash skills/cc-dropbox/scripts/share.sh    /Papers/draft.pdf
 **Upload** prints a one-line JSON summary on success:
 
 ```
-$ bash skills/cc-dropbox/scripts/upload.sh ./report.pdf /Papers/report.pdf
+$ bash scripts/upload.sh ./report.pdf /Papers/report.pdf
 {"path":"/Papers/report.pdf","size":184523,"content_hash":"9f86d081884c7d65..."}
 ```
 
 **Download** prints the saved local path:
 
 ```
-$ bash skills/cc-dropbox/scripts/download.sh /Papers/draft.pdf
+$ bash scripts/download.sh /Papers/draft.pdf
 draft.pdf
 ```
 
 **Share** prints the URL (preview form — swap `?dl=0` → `?dl=1` for direct download):
 
 ```
-$ bash skills/cc-dropbox/scripts/share.sh /Papers/draft.pdf
+$ bash scripts/share.sh /Papers/draft.pdf
 https://www.dropbox.com/scl/fi/abc123/draft.pdf?dl=0
 ```
 
@@ -136,14 +172,14 @@ https://www.dropbox.com/scl/fi/abc123/draft.pdf?dl=0
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `cc-dropbox: no credentials. Run setup.sh first.` | `~/.config/cc-dropbox/credentials.json` missing | `bash skills/cc-dropbox/scripts/setup.sh` |
-| `cc-dropbox: refresh token rejected. Re-run setup.sh.` | Refresh token revoked or app permissions changed | Re-run setup.sh |
-| `cc-dropbox: dropbox path must start with '/'` | Gave a relative Dropbox path | Use an absolute path like `/Papers/file.pdf` |
-| `cc-dropbox: File exists: <path>` (download) | Local file or symlink already present | Remove it or pass a different destination |
-| `cc-dropbox: Not found: <path>` | Dropbox path doesn't exist | Verify the path in the Dropbox web UI |
-| `cc-dropbox: 'jq' is required but not found.` | Missing dependency | Install `jq` (e.g. `sudo apt install jq` / `brew install jq`) |
+| `dropbox-skill: no credentials. Run setup.sh first.` | `~/.config/dropbox-skill/credentials.json` missing | `bash scripts/setup.sh` |
+| `dropbox-skill: refresh token rejected. Re-run setup.sh.` | Refresh token revoked or app permissions changed | Re-run setup.sh |
+| `dropbox-skill: dropbox path must start with '/'` | Gave a relative Dropbox path | Use an absolute path like `/Papers/file.pdf` |
+| `dropbox-skill: File exists: <path>` (download) | Local file or symlink already present | Remove it or pass a different destination |
+| `dropbox-skill: Not found: <path>` | Dropbox path doesn't exist | Verify the path in the Dropbox web UI |
+| `dropbox-skill: 'jq' is required but not found.` | Missing dependency | Install `jq` (e.g. `sudo apt install jq` / `brew install jq`) |
 
-All errors go to stderr with a `cc-dropbox:` prefix. Exit codes:
+All errors go to stderr with a `dropbox-skill:` prefix. Exit codes:
 
 | Code | Meaning |
 |---|---|
@@ -158,7 +194,7 @@ All errors go to stderr with a `cc-dropbox:` prefix. Exit codes:
 
 ## Security
 
-- Credentials are stored at `~/.config/cc-dropbox/credentials.json` with `chmod 600`.
+- Credentials are stored at `~/.config/dropbox-skill/credentials.json` with `chmod 600`.
 - Access tokens are refreshed on demand; only the refresh token persists at rest.
 - Credentials writes are atomic (same-directory `mktemp` + `mv`) so an interrupt can't corrupt the file.
 - Refresh responses are validated before being written — malformed JSON or missing fields never replace a good credentials file.
@@ -170,15 +206,15 @@ All errors go to stderr with a `cc-dropbox:` prefix. Exit codes:
 Unit tests (mocked `curl`) run offline with no network or credentials:
 
 ```bash
-bash skills/cc-dropbox/scripts/test/run_tests.sh
+bash scripts/test/run_tests.sh
 ```
 
 Expected: `TOTAL: pass=88 fail=0`.
 
-Integration test (hits real Dropbox, requires a configured `credentials.json`):
+Integration test (hits real Dropbox, requires a configured `credentials.json` in the new config path or the legacy fallback path):
 
 ```bash
-DROPBOX_INTEGRATION_TEST=1 bash skills/cc-dropbox/scripts/test/integration.sh
+DROPBOX_INTEGRATION_TEST=1 bash scripts/test/integration.sh
 ```
 
 The integration script uploads a small file, downloads it and verifies the hash, creates and reuses a share link, and exercises the chunked upload path with a 200 MB file. It cleans up its own test files on exit.
@@ -192,7 +228,7 @@ Contributions welcome — issues and PRs both.
 - Keep scripts **focused** — `auth.sh` is the only sourceable library; each operation script stays single-file.
 - Run the full suite before opening a PR:
   ```bash
-  bash skills/cc-dropbox/scripts/test/run_tests.sh
+  bash scripts/test/run_tests.sh
   ```
 - Commit messages follow conventional prefixes: `feat(scope):`, `fix(scope):`, `test(scope):`, `docs:`, `chore:`.
 

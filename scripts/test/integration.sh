@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Manual end-to-end test against a real Dropbox account.
 # Run with: DROPBOX_INTEGRATION_TEST=1 bash integration.sh
-# Requires an already-configured ~/.config/cc-dropbox/credentials.json.
+# Requires an already-configured ~/.config/dropbox-skill/credentials.json.
 set -euo pipefail
 
 if [[ "${DROPBOX_INTEGRATION_TEST:-}" != "1" ]]; then
@@ -10,7 +10,7 @@ if [[ "${DROPBOX_INTEGRATION_TEST:-}" != "1" ]]; then
 fi
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-REMOTE_DIR="/cc-dropbox-test-$(date +%s)"
+REMOTE_DIR="/dropbox-skill-test-$(date +%s)"
 SMALL="$REMOTE_DIR/small.bin"
 BIG="$REMOTE_DIR/big.bin"
 

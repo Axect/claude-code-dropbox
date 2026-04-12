@@ -41,14 +41,14 @@ assert_contains() {
   fi
 }
 
-# Create an isolated HOME with an empty ~/.config/cc-dropbox directory.
+# Create an isolated HOME with an empty ~/.config/dropbox-skill directory.
 # Cleans up automatically on subshell exit (each test file runs in its
 # own subshell courtesy of run_tests.sh). Returns the path on stdout.
 make_tmp_home() {
   local tmp
   tmp=$(mktemp -d)
   export HOME="$tmp"
-  mkdir -p "$tmp/.config/cc-dropbox"
+  mkdir -p "$tmp/.config/dropbox-skill"
   trap 'rm -rf "$HOME"' EXIT
   echo "$tmp"
 }
@@ -56,9 +56,9 @@ make_tmp_home() {
 # Write a credentials.json into the current HOME.
 write_creds() {
   local json="$1"
-  mkdir -p "$HOME/.config/cc-dropbox"
-  printf '%s' "$json" > "$HOME/.config/cc-dropbox/credentials.json"
-  chmod 600 "$HOME/.config/cc-dropbox/credentials.json"
+  mkdir -p "$HOME/.config/dropbox-skill"
+  printf '%s' "$json" > "$HOME/.config/dropbox-skill/credentials.json"
+  chmod 600 "$HOME/.config/dropbox-skill/credentials.json"
 }
 
 # Mock curl: responds based on $MOCK_CURL_RESPONSE (body) and

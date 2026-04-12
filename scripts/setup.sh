@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
-# cc-dropbox setup: interactive OAuth2 bootstrap.
+# dropbox-skill setup: interactive OAuth2 bootstrap.
 # Sourceable for tests: defines exchange_code(). If executed directly, runs
 # the interactive flow at the bottom.
 
 set -uo pipefail
 
-# CC_DROPBOX_CREDS: override credentials path (used by tests and for multi-account setups).
+# DROPBOX_SKILL_CREDS: override credentials path (used by tests and for multi-account setups).
 # Intentionally duplicated from auth.sh — setup.sh must not source auth.sh so
 # that setup can run on a fresh install with no credentials file present.
-CC_DROPBOX_CREDS="${CC_DROPBOX_CREDS:-$HOME/.config/cc-dropbox/credentials.json}"
+DROPBOX_SKILL_CREDS="${DROPBOX_SKILL_CREDS:-$HOME/.config/dropbox-skill/credentials.json}"
+LEGACY_CC_DROPBOX_CREDS="${CC_DROPBOX_CREDS:-$HOME/.config/cc-dropbox/credentials.json}"
+if [[ -z "${DROPBOX_SKILL_CREDS_EXPLICIT:-}" && ! -f "$DROPBOX_SKILL_CREDS" && -f "$LEGACY_CC_DROPBOX_CREDS" ]]; then
+  DROPBOX_SKILL_CREDS="$LEGACY_CC_DROPBOX_CREDS"
+fi
 
 require_deps() {
   for cmd in curl jq; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
-      echo "cc-dropbox: '$cmd' is required but not found." >&2
+      echo "dropbox-skill: '$cmd' is required but not found." >&2
       exit 127
     fi
   done
@@ -27,7 +31,7 @@ exchange_code() {
   local response body http_code
   # TODO(security): client_secret is passed via curl argv and is briefly visible
   # in /proc/<pid>/cmdline on multi-user systems. Acceptable trade-off for a
-  # personal-use plugin; if multi-user support is added, pipe credentials via
+  # personal-use skill; if multi-user support is added, pipe credentials via
   # stdin instead. Same trade-off in auth.sh refresh path.
   response=$(curl -sS -w $'\n%{http_code}' \
     -X POST "https://api.dropboxapi.com/oauth2/token" \
@@ -39,12 +43,12 @@ exchange_code() {
   body=$(printf '%s' "$response" | sed '$d')
 
   if [[ "$http_code" != "200" ]]; then
-    echo "cc-dropbox: token exchange failed (HTTP $http_code): $body" >&2
+    echo "dropbox-skill: token exchange failed (HTTP $http_code): $body" >&2
     return 1
   fi
 
   if ! printf '%s' "$body" | jq empty >/dev/null 2>&1; then
-    echo "cc-dropbox: token exchange response is not valid JSON: $body" >&2
+    echo "dropbox-skill: token exchange response is not valid JSON: $body" >&2
     return 1
   fi
 
@@ -57,7 +61,7 @@ exchange_code() {
      || -z "$refresh" || "$refresh" == "null" \
      || -z "$expires_in" || "$expires_in" == "null" \
      || ! "$expires_in" =~ ^[0-9]+$ ]]; then
-    echo "cc-dropbox: token exchange response missing required fields" >&2
+    echo "dropbox-skill: token exchange response missing required fields" >&2
     return 1
   fi
 
@@ -65,9 +69,9 @@ exchange_code() {
   now=$(date +%s)
   expires_at=$(( now + expires_in ))
 
-  mkdir -p "$(dirname "$CC_DROPBOX_CREDS")"
+  mkdir -p "$(dirname "$DROPBOX_SKILL_CREDS")"
   local tmp
-  tmp=$(mktemp "${CC_DROPBOX_CREDS}.XXXXXX")
+  tmp=$(mktemp "${DROPBOX_SKILL_CREDS}.XXXXXX")
   if ! jq -n \
       --arg ak "$app_key" \
       --arg as "$app_secret" \
@@ -77,23 +81,23 @@ exchange_code() {
       '{app_key:$ak, app_secret:$as, refresh_token:$rt, access_token:$at, access_token_expires_at:$exp}' \
       > "$tmp"; then
     rm -f "$tmp"
-    echo "cc-dropbox: failed to write credentials.json" >&2
+    echo "dropbox-skill: failed to write credentials.json" >&2
     return 1
   fi
-  if ! mv "$tmp" "$CC_DROPBOX_CREDS"; then
+  if ! mv "$tmp" "$DROPBOX_SKILL_CREDS"; then
     rm -f "$tmp"
-    echo "cc-dropbox: failed to install credentials.json" >&2
+    echo "dropbox-skill: failed to install credentials.json" >&2
     return 1
   fi
-  chmod 600 "$CC_DROPBOX_CREDS" || \
-    echo "cc-dropbox: warning: chmod 600 failed on $CC_DROPBOX_CREDS" >&2
+  chmod 600 "$DROPBOX_SKILL_CREDS" || \
+    echo "dropbox-skill: warning: chmod 600 failed on $DROPBOX_SKILL_CREDS" >&2
   return 0
 }
 
 run_interactive() {
   require_deps
 
-  echo "=== cc-dropbox setup ==="
+  echo "=== dropbox-skill setup ==="
   echo
   echo "1. Go to https://www.dropbox.com/developers/apps and create (or open) your app."
   echo "   - Permission type: Scoped access"
@@ -103,9 +107,9 @@ run_interactive() {
   echo "   - Submit the permissions."
   echo
   read -r -p "App key: " APP_KEY
-  [[ -z "$APP_KEY" ]] && { echo "cc-dropbox: app key is required" >&2; exit 1; }
+  [[ -z "$APP_KEY" ]] && { echo "dropbox-skill: app key is required" >&2; exit 1; }
   read -r -s -p "App secret (hidden): " APP_SECRET; echo
-  [[ -z "$APP_SECRET" ]] && { echo "cc-dropbox: app secret is required" >&2; exit 1; }
+  [[ -z "$APP_SECRET" ]] && { echo "dropbox-skill: app secret is required" >&2; exit 1; }
   echo
   echo "2. Open this URL in a browser and approve access:"
   echo
@@ -114,11 +118,11 @@ run_interactive() {
   echo "   After approving, Dropbox will display an authorization code. Copy it."
   echo
   read -r -p "Paste the authorization code: " AUTH_CODE
-  [[ -z "$AUTH_CODE" ]] && { echo "cc-dropbox: authorization code is required" >&2; exit 1; }
+  [[ -z "$AUTH_CODE" ]] && { echo "dropbox-skill: authorization code is required" >&2; exit 1; }
 
   if exchange_code "$APP_KEY" "$APP_SECRET" "$AUTH_CODE"; then
     echo
-    echo "✓ Setup complete. Credentials saved to $CC_DROPBOX_CREDS"
+    echo "✓ Setup complete. Credentials saved to $DROPBOX_SKILL_CREDS"
   else
     echo
     echo "✗ Setup failed." >&2

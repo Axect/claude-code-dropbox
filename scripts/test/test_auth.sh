@@ -60,10 +60,10 @@ assert_exit_code 0 "$code" "refresh returns 0"
 assert_eq "fresh_token" "$out" "returns new access token"
 
 # Verify credentials.json was updated.
-new_token=$(jq -r '.access_token' "$HOME/.config/cc-dropbox/credentials.json")
+new_token=$(jq -r '.access_token' "$HOME/.config/dropbox-skill/credentials.json")
 assert_eq "fresh_token" "$new_token" "credentials.json updated"
 
-new_exp=$(jq -r '.access_token_expires_at' "$HOME/.config/cc-dropbox/credentials.json")
+new_exp=$(jq -r '.access_token_expires_at' "$HOME/.config/dropbox-skill/credentials.json")
 now=$(date +%s)
 if (( new_exp > now + 14000 && new_exp < now + 14500 )); then
   _pass
@@ -144,9 +144,9 @@ assert_exit_code 5 "$code" "malformed 200 response exits 5"
 assert_contains "$(cat /tmp/cc_err)" "missing required fields" "error names the problem"
 
 # Verify credentials.json is unchanged (still has old access_token and past expires_at).
-preserved_token=$(jq -r '.access_token' "$HOME/.config/cc-dropbox/credentials.json")
+preserved_token=$(jq -r '.access_token' "$HOME/.config/dropbox-skill/credentials.json")
 assert_eq "old" "$preserved_token" "credentials.json access_token untouched"
-preserved_exp=$(jq -r '.access_token_expires_at' "$HOME/.config/cc-dropbox/credentials.json")
+preserved_exp=$(jq -r '.access_token_expires_at' "$HOME/.config/dropbox-skill/credentials.json")
 assert_eq "$past" "$preserved_exp" "credentials.json expires_at untouched"
 unmock_curl
 
@@ -169,6 +169,6 @@ code=0
 
 assert_exit_code 5 "$code" "non-JSON 200 response exits 5"
 assert_contains "$(cat /tmp/cc_err)" "not valid JSON" "error names non-JSON"
-preserved_token=$(jq -r '.access_token' "$HOME/.config/cc-dropbox/credentials.json")
+preserved_token=$(jq -r '.access_token' "$HOME/.config/dropbox-skill/credentials.json")
 assert_eq "old" "$preserved_token" "non-JSON case: access_token untouched"
 unmock_curl

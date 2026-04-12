@@ -13,5 +13,10 @@
 - `scripts/test/integration.sh`: gated end-to-end integration script (requires `DROPBOX_INTEGRATION_TEST=1`)
 - `README.md` with installation, setup, usage, and security notes
 
+### Changed
+- Repackaged the repository as a portable Agent Skills skill rooted at `SKILL.md`
+- Renamed the public skill/package identity from `cc-dropbox` to `dropbox-skill`
+- Switched the default credentials path to `~/.config/dropbox-skill/credentials.json` with fallback support for the legacy `~/.config/cc-dropbox/credentials.json`
+
 ### Test coverage
 - 88 unit assertions across 7 test files, all passing offline with mocked curl

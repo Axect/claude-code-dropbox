@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cc-dropbox share: create or retrieve a shared link for a Dropbox path.
+# dropbox-skill share: create or retrieve a shared link for a Dropbox path.
 # Usage: share.sh <dropbox_path>
 set -uo pipefail
 
@@ -16,7 +16,7 @@ usage() {
 REMOTE="$1"
 
 if [[ "${REMOTE:0:1}" != "/" ]]; then
-  echo "cc-dropbox: dropbox path must start with '/': $REMOTE" >&2
+  echo "dropbox-skill: dropbox path must start with '/': $REMOTE" >&2
   exit 1
 fi
 
@@ -47,7 +47,7 @@ fi
 if [[ "$http_code" == "409" ]]; then
   summary=$(printf '%s' "$body" | jq -r '.error_summary // ""')
   if [[ "$summary" == path/not_found* ]]; then
-    echo "cc-dropbox: Not found: $REMOTE" >&2
+    echo "dropbox-skill: Not found: $REMOTE" >&2
     exit 4
   fi
   if [[ "$summary" == shared_link_already_exists* ]]; then
@@ -62,12 +62,12 @@ if [[ "$http_code" == "409" ]]; then
     http_code=$(printf '%s' "$response" | tail -n1)
     body=$(printf '%s' "$response" | sed '$d')
     if [[ "$http_code" != "200" ]]; then
-      echo "cc-dropbox: list_shared_links failed (HTTP $http_code): $body" >&2
+      echo "dropbox-skill: list_shared_links failed (HTTP $http_code): $body" >&2
       exit 5
     fi
     url=$(printf '%s' "$body" | jq -r '.links[0].url // ""')
     if [[ -z "$url" ]]; then
-      echo "cc-dropbox: no existing shared link found for $REMOTE" >&2
+      echo "dropbox-skill: no existing shared link found for $REMOTE" >&2
       exit 5
     fi
     printf '%s\n' "$url"
@@ -75,5 +75,5 @@ if [[ "$http_code" == "409" ]]; then
   fi
 fi
 
-echo "cc-dropbox: share failed (HTTP $http_code): $body" >&2
+echo "dropbox-skill: share failed (HTTP $http_code): $body" >&2
 exit 5

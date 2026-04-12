@@ -1,19 +1,23 @@
 # shellcheck shell=bash
 # Sourceable library. Provides: get_access_token, api_call.
 
-# CC_DROPBOX_CREDS: override credentials path (used by tests and for multi-account setups).
-CC_DROPBOX_CREDS="${CC_DROPBOX_CREDS:-$HOME/.config/cc-dropbox/credentials.json}"
+# DROPBOX_SKILL_CREDS: override credentials path (used by tests and for multi-account setups).
+DROPBOX_SKILL_CREDS="${DROPBOX_SKILL_CREDS:-$HOME/.config/dropbox-skill/credentials.json}"
+LEGACY_CC_DROPBOX_CREDS="${CC_DROPBOX_CREDS:-$HOME/.config/cc-dropbox/credentials.json}"
+if [[ -z "${DROPBOX_SKILL_CREDS_EXPLICIT:-}" && ! -f "$DROPBOX_SKILL_CREDS" && -f "$LEGACY_CC_DROPBOX_CREDS" ]]; then
+  DROPBOX_SKILL_CREDS="$LEGACY_CC_DROPBOX_CREDS"
+fi
 
 get_access_token() {
-  if [[ ! -f "$CC_DROPBOX_CREDS" ]]; then
-    echo "cc-dropbox: no credentials. Run setup.sh first." >&2
+  if [[ ! -f "$DROPBOX_SKILL_CREDS" ]]; then
+    echo "dropbox-skill: no credentials. Run setup.sh first." >&2
     return 2
   fi
 
   local now access_token expires_at
   now=$(date +%s)
-  access_token=$(jq -r '.access_token // ""' "$CC_DROPBOX_CREDS")
-  expires_at=$(jq -r '.access_token_expires_at // 0' "$CC_DROPBOX_CREDS")
+  access_token=$(jq -r '.access_token // ""' "$DROPBOX_SKILL_CREDS")
+  expires_at=$(jq -r '.access_token_expires_at // 0' "$DROPBOX_SKILL_CREDS")
 
   if [[ -n "$access_token" && "$expires_at" -gt "$((now + 60))" ]]; then
     printf '%s' "$access_token"
@@ -22,14 +26,14 @@ get_access_token() {
 
   # Refresh the access token.
   local app_key app_secret refresh_token
-  app_key=$(jq -r '.app_key' "$CC_DROPBOX_CREDS")
-  app_secret=$(jq -r '.app_secret' "$CC_DROPBOX_CREDS")
-  refresh_token=$(jq -r '.refresh_token' "$CC_DROPBOX_CREDS")
+  app_key=$(jq -r '.app_key' "$DROPBOX_SKILL_CREDS")
+  app_secret=$(jq -r '.app_secret' "$DROPBOX_SKILL_CREDS")
+  refresh_token=$(jq -r '.refresh_token' "$DROPBOX_SKILL_CREDS")
 
   local response body http_code
   # TODO(security): client_secret is passed via curl argv and is briefly visible
   # in /proc/<pid>/cmdline on multi-user systems. Acceptable trade-off for a
-  # personal-use plugin; if multi-user support is added, pipe credentials via
+  # personal-use skill; if multi-user support is added, pipe credentials via
   # stdin instead. Same trade-off in setup.sh exchange_code.
   response=$(curl -sS -w $'\n%{http_code}' \
     -X POST "https://api.dropboxapi.com/oauth2/token" \
@@ -42,15 +46,15 @@ get_access_token() {
 
   if [[ "$http_code" != "200" ]]; then
     if printf '%s' "$body" | jq -e '.error == "invalid_grant"' >/dev/null 2>&1; then
-      echo "cc-dropbox: refresh token rejected. Re-run setup.sh." >&2
+      echo "dropbox-skill: refresh token rejected. Re-run setup.sh." >&2
       return 3
     fi
-    echo "cc-dropbox: refresh failed (HTTP $http_code): $body" >&2
+    echo "dropbox-skill: refresh failed (HTTP $http_code): $body" >&2
     return 5
   fi
 
   if ! printf '%s' "$body" | jq empty >/dev/null 2>&1; then
-    echo "cc-dropbox: refresh response is not valid JSON: $body" >&2
+    echo "dropbox-skill: refresh response is not valid JSON: $body" >&2
     return 5
   fi
 
@@ -61,23 +65,23 @@ get_access_token() {
   if [[ -z "$new_access" || "$new_access" == "null" \
      || -z "$new_expires_in" || "$new_expires_in" == "null" \
      || ! "$new_expires_in" =~ ^[0-9]+$ ]]; then
-    echo "cc-dropbox: refresh response missing required fields" >&2
+    echo "dropbox-skill: refresh response missing required fields" >&2
     return 5
   fi
 
   new_expires_at=$(( now + new_expires_in ))
 
   local tmp
-  tmp=$(mktemp "${CC_DROPBOX_CREDS}.XXXXXX")
+  tmp=$(mktemp "${DROPBOX_SKILL_CREDS}.XXXXXX")
   if ! jq --arg tok "$new_access" --argjson exp "$new_expires_at" \
        '.access_token = $tok | .access_token_expires_at = $exp' \
-       "$CC_DROPBOX_CREDS" > "$tmp"; then
+       "$DROPBOX_SKILL_CREDS" > "$tmp"; then
     rm -f "$tmp"
-    echo "cc-dropbox: failed to update credentials.json" >&2
+    echo "dropbox-skill: failed to update credentials.json" >&2
     return 5
   fi
-  mv "$tmp" "$CC_DROPBOX_CREDS"
-  chmod 600 "$CC_DROPBOX_CREDS"
+  mv "$tmp" "$DROPBOX_SKILL_CREDS"
+  chmod 600 "$DROPBOX_SKILL_CREDS"
 
   printf '%s' "$new_access"
   return 0
@@ -105,6 +109,6 @@ api_call() {
     printf '%s' "$resp_body"
     return 0
   fi
-  echo "cc-dropbox: API error (HTTP $http_code): $resp_body" >&2
+  echo "dropbox-skill: API error (HTTP $http_code): $resp_body" >&2
   return 5
 }
